@@ -225,14 +225,26 @@ def main():
             st.warning(f"⚠️ Gagal membaca room_capacity.csv: {e}")
             capacity_df = pd.DataFrame(columns=['Hotel', 'Room_Available'])
     else:
-        st.warning("⚠️ File 'room_capacity.csv' tidak ditemukan.")
-        capacity_df = pd.DataFrame(columns=['Hotel', 'Room_Available'])
+        # Auto-create with sample data
+        sample_capacity = pd.DataFrame({
+            'Hotel': ['Daun Bali Seminyak', "D'Prima Hotel Petitenget", 'Kamanya Petitenget',
+                      'The Capital Seminyak', 'Paragon Seminyak', 'Liberta'],
+            'Room_Available': [50, 45, 40, 55, 48, 42]
+        })
+        try:
+            sample_capacity.to_csv(capacity_path, index=False)
+            st.info("✅ File 'room_capacity.csv' dibuat otomatis dengan data sampel.")
+            capacity_df = sample_capacity
+        except Exception as e:
+            st.warning(f"⚠️ Gagal membuat room_capacity.csv: {e}")
+            capacity_df = sample_capacity
 
+    # Get hotels list from capacity or data
     hotels_list = []
-    if not df.empty and 'Hotel' in df.columns:
-        hotels_list = sorted(df['Hotel'].dropna().unique().tolist())
-    elif not capacity_df.empty and 'Hotel' in capacity_df.columns:
+    if not capacity_df.empty and 'Hotel' in capacity_df.columns:
         hotels_list = sorted(capacity_df['Hotel'].dropna().unique().tolist())
+    elif not df.empty and 'Hotel' in df.columns:
+        hotels_list = sorted(df['Hotel'].dropna().unique().tolist())
     else:
         hotels_list = ['Daun Bali Seminyak', "D'Prima Hotel Petitenget", 'Kamanya Petitenget',
                        'The Capital Seminyak', 'Paragon Seminyak', 'Liberta']
