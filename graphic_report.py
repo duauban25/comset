@@ -13,6 +13,14 @@ from pdf_report import generate_graphic_pdf
 # Data directory helper (shared)
 # ---------------------------------
 def get_data_dir() -> str:
+    # Prefer fixed '/data' if writable
+    fixed = "/data"
+    try:
+        os.makedirs(fixed, exist_ok=True)
+        return fixed
+    except Exception:
+        pass
+    # Then try secrets
     try:
         dd = st.secrets.get("DATA_DIR")
         if dd:
@@ -20,10 +28,12 @@ def get_data_dir() -> str:
             return dd
     except Exception:
         pass
+    # Then env var
     dd = os.environ.get("DATA_DIR")
     if dd:
         os.makedirs(dd, exist_ok=True)
         return dd
+    # Fallback to local ./data
     dd = os.path.join(os.getcwd(), "data")
     os.makedirs(dd, exist_ok=True)
     return dd

@@ -43,31 +43,34 @@ def _is_writable(dir_path: str) -> bool:
         return False
 
 def get_data_dir() -> str:
-    # Priority order for data directory resolution (align with simple secrets-first pattern)
-    # 1) Streamlit secrets
+    # Priority: fixed '/data' first (as requested)
+    fixed_dir = "/data"
+    if _is_writable(fixed_dir):
+        return fixed_dir
+    # Next: Streamlit secrets
     try:
         secrets_dir = st.secrets.get("DATA_DIR")  # type: ignore[attr-defined]
         if secrets_dir and _is_writable(secrets_dir):
             return secrets_dir
     except Exception:
         pass
-    # 2) Environment variable
+    # Next: Environment variable
     env_dir = os.environ.get("DATA_DIR")
     if env_dir and _is_writable(env_dir):
         return env_dir
-    # 3) Streamlit Cloud persistent storage (common default)
+    # Next: Streamlit Cloud persistent storage
     mount_dir = "/mount/data"
     if _is_writable(mount_dir):
         return mount_dir
-    # 4) Current working directory
+    # Fallbacks
     cwd_dir = os.path.join(os.getcwd(), "data")
     if _is_writable(cwd_dir):
         return cwd_dir
-    # 5) User Documents/compbaru (local development fallback)
+    # User Documents/compbaru (local development fallback)
     docs_dir = os.path.join(os.path.expanduser("~"), "Documents", "compbaru")
     if _is_writable(docs_dir):
         return docs_dir
-    # 6) Temp directory (last resort)
+    # Temp directory (last resort)
     tmp_dir = os.path.join(tempfile.gettempdir(), "compbaru")
     os.makedirs(tmp_dir, exist_ok=True)
     return tmp_dir
@@ -111,21 +114,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 st.markdown("<div class='mx-auto max-w-screen-2xl px-4 py-2'>", unsafe_allow_html=True)
 
-# DIAGNOSTIC INFO
-with st.expander("🔍 System Diagnostic Info"):
-    st.write(f"**Current DATA_DIR**: `{DATA_DIR}`")
-    st.write(f"**Directory exists**: {os.path.exists(DATA_DIR)}")
-    st.write(f"**Directory writable**: {_is_writable(DATA_DIR)}")
-    st.write(f"**comparative_data.csv path**: `{file_path}`")
-    st.write(f"**comparative_data.csv exists**: {os.path.exists(file_path)}")
-    st.write(f"**room_capacity.csv path**: `{os.path.join(DATA_DIR, 'room_capacity.csv')}`")
-    st.write(f"**room_capacity.csv exists**: {os.path.exists(os.path.join(DATA_DIR, 'room_capacity.csv'))}")
-    if "/mount/data" in DATA_DIR:
-        st.success("✅ Using Streamlit Cloud persistent storage")
-    elif "Documents/compbaru" in DATA_DIR:
-        st.warning("⚠️ Using local home directory (not persistent on Cloud)")
-    else:
-        st.info(f"ℹ️ Using custom directory: {DATA_DIR}")
 
 # ===========================
 # LOAD & PREPARE DATA
