@@ -110,7 +110,23 @@ st.markdown("""
 <h3 class="text-lg font-semibold text-emerald-800 mb-2">🖨️ Export Comparative Report to PDF</h3>
 """, unsafe_allow_html=True)
 st.markdown("<div class='mx-auto max-w-screen-2xl px-4 py-2'>", unsafe_allow_html=True)
-            
+
+# DIAGNOSTIC INFO
+with st.expander("🔍 System Diagnostic Info"):
+    st.write(f"**Current DATA_DIR**: `{DATA_DIR}`")
+    st.write(f"**Directory exists**: {os.path.exists(DATA_DIR)}")
+    st.write(f"**Directory writable**: {_is_writable(DATA_DIR)}")
+    st.write(f"**comparative_data.csv path**: `{file_path}`")
+    st.write(f"**comparative_data.csv exists**: {os.path.exists(file_path)}")
+    st.write(f"**room_capacity.csv path**: `{os.path.join(DATA_DIR, 'room_capacity.csv')}`")
+    st.write(f"**room_capacity.csv exists**: {os.path.exists(os.path.join(DATA_DIR, 'room_capacity.csv'))}")
+    if "/mount/data" in DATA_DIR:
+        st.success("✅ Using Streamlit Cloud persistent storage")
+    elif "Documents/compbaru" in DATA_DIR:
+        st.warning("⚠️ Using local home directory (not persistent on Cloud)")
+    else:
+        st.info(f"ℹ️ Using custom directory: {DATA_DIR}")
+
 # ===========================
 # LOAD & PREPARE DATA
 # ===========================
@@ -124,13 +140,27 @@ required_cols = ['Date', 'Hotel', 'Room_Available', 'Room_Sold', 'ADR']
 if os.path.exists(file_path):
     try:
         df = pd.read_csv(file_path, parse_dates=['Date'])
-    except Exception:
-        st.warning("⚠️ File CSV gagal dibaca. Membuat file baru kosong.")
+        st.success(f"✅ Data dimuat dari: {file_path} ({len(df)} records)")
+    except Exception as e:
+        st.warning(f"⚠️ File CSV gagal dibaca: {e}. Membuat file baru kosong.")
         df = pd.DataFrame(columns=required_cols)
-        df.to_csv(file_path, index=False)
+        try:
+            df.to_csv(file_path, index=False)
+            st.info("✅ File comparative_data.csv kosong berhasil dibuat.")
+        except Exception as write_err:
+            st.error(f"❌ Gagal menulis CSV: {write_err}")
+            st.stop()
 else:
+    st.info("📝 File comparative_data.csv tidak ditemukan. Membuat file baru...")
     df = pd.DataFrame(columns=required_cols)
-    df.to_csv(file_path, index=False)
+    try:
+        df.to_csv(file_path, index=False)
+        st.success("✅ File comparative_data.csv berhasil dibuat.")
+    except Exception as e:
+        st.error(f"❌ Gagal membuat file CSV: {e}")
+        st.error(f"❌ Path: {file_path}")
+        st.error(f"❌ Directory: {DATA_DIR}")
+        st.stop()
 
 # Pastikan semua kolom wajib ada
 for c in required_cols:
@@ -155,9 +185,10 @@ df["Room_Revenue"] = df["Room_Sold"] * df["ADR"]
 # (Opsional) Simpan hasil perhitungan ke file
 try:
     df.to_csv(file_path, index=False)
+    st.info("💾 Data berhasil diperbarui.")
 except Exception as e:
     st.error(f"❌ Gagal menyimpan pembaruan ke CSV: {e}")
-
+    st.stop()
 
 # ===========================
 # ROOM CAPACITY REFERENCE
@@ -173,9 +204,22 @@ if os.path.exists(capacity_path):
         capacity_df = pd.DataFrame(columns=['Hotel', 'Room_Available'])
 else:
     st.warning("⚠️ File 'room_capacity.csv' tidak ditemukan. Buat file tersebut dengan kolom Hotel dan Room_Available.")
-    capacity_df = pd.DataFrame(columns=['Hotel', 'Room_Available'])
+    sample_capacity = pd.DataFrame({
+        'Hotel': ['Daun Bali Seminyak', "D'Prima Hotel Petitenget", 'Kamanya Petitenget',
+                  'The Capital Seminyak', 'Paragon Seminyak', 'Liberta'],
+        'Room_Available': [100, 50, 75, 120, 80, 60]
+    })
+    try:
+        sample_capacity.to_csv(capacity_path, index=False)
+        st.success("✅ File 'room_capacity.csv' dibuat otomatis dengan data sampel.")
+        capacity_df = sample_capacity
+    except Exception as e:
+        st.error(f"❌ Gagal membuat room_capacity.csv: {e}")
+        st.error(f"❌ Path: {capacity_path}")
+        st.error(f"❌ Directory: {DATA_DIR}")
+        capacity_df = pd.DataFrame(columns=['Hotel', 'Room_Available'])
 
-    # Pastikan hotels_list selalu ada
+# Pastikan hotels_list selalu ada
 hotels_list = []
 
 if not df.empty and 'Hotel' in df.columns:
