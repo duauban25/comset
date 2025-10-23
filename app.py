@@ -189,19 +189,35 @@ def main():
     st.markdown("<div class='mx-auto max-w-screen-2xl px-4 py-2'>", unsafe_allow_html=True)
 
     # LOAD DATA
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    try:
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    except Exception as e:
+        st.error(f"❌ Gagal membuat direktori data: {e}")
+        st.stop()
+
     required_cols = ['Date', 'Hotel', 'Room_Available', 'Room_Sold', 'ADR']
 
     if os.path.exists(file_path):
         try:
             df = pd.read_csv(file_path, parse_dates=['Date'])
-        except Exception:
-            st.warning("⚠️ File CSV gagal dibaca. Membuat file baru kosong.")
+            st.info(f"✅ Data dimuat dari: {file_path}")
+        except Exception as e:
+            st.warning(f"⚠️ File CSV gagal dibaca: {e}. Membuat file baru kosong.")
             df = pd.DataFrame(columns=required_cols)
-            df.to_csv(file_path, index=False)
+            try:
+                df.to_csv(file_path, index=False)
+            except Exception as write_err:
+                st.error(f"❌ Gagal menulis CSV: {write_err}")
+                st.stop()
     else:
+        st.info("📝 File comparative_data.csv tidak ditemukan. Membuat file baru...")
         df = pd.DataFrame(columns=required_cols)
-        df.to_csv(file_path, index=False)
+        try:
+            df.to_csv(file_path, index=False)
+            st.success("✅ File comparative_data.csv berhasil dibuat.")
+        except Exception as e:
+            st.error(f"❌ Gagal membuat file CSV: {e}")
+            st.stop()
 
     for c in required_cols:
         if c not in df.columns:
@@ -216,6 +232,7 @@ def main():
         df.to_csv(file_path, index=False)
     except Exception as e:
         st.error(f"❌ Gagal menyimpan pembaruan ke CSV: {e}")
+        st.stop()
 
     # ROOM CAPACITY
     if os.path.exists(capacity_path):
