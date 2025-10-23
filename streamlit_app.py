@@ -6,6 +6,26 @@ from datetime import datetime
 from pdf_report import generate_graphic_pdf
 from graphic_report import generate_graphic_report
 
+# --- Data directory helper ---
+def get_data_dir() -> str:
+    # 1) Streamlit secrets
+    try:
+        dd = st.secrets.get("DATA_DIR")
+        if dd:
+            os.makedirs(dd, exist_ok=True)
+            return dd
+    except Exception:
+        pass
+    # 2) Env var
+    dd = os.environ.get("DATA_DIR")
+    if dd:
+        os.makedirs(dd, exist_ok=True)
+        return dd
+    # 3) Fallback to local ./data
+    dd = os.path.join(os.getcwd(), "data")
+    os.makedirs(dd, exist_ok=True)
+    return dd
+
 # --- Setup ---
 st.set_page_config(page_title="Daun Hospitality Dashboard", layout="wide")
 
@@ -34,12 +54,12 @@ if uploaded_file is not None:
         st.write(f"Rows: {df.shape[0]}, Columns: {df.shape[1]}")
 
         # --- Persist uploaded data for other modules ---
-        # Save to data/comparative_data.csv so graphic_report can read it
+        # Save to DATA_DIR/comparative_data.csv so graphic_report can read it
         try:
-            os.makedirs("data", exist_ok=True)
-            save_path = os.path.join("data", "comparative_data.csv")
+            DATA_DIR = get_data_dir()
+            save_path = os.path.join(DATA_DIR, "comparative_data.csv")
             df.to_csv(save_path, index=False)
-            st.info(f"Saved uploaded data to {save_path} for downstream reports.")
+            st.info(f"Saved uploaded data to {save_path} (DATA_DIR)")
         except Exception as e:
             st.warning(f"Could not save comparative_data.csv: {e}")
 

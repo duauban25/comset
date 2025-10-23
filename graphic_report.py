@@ -9,6 +9,25 @@ from pathlib import Path
 from datetime import datetime
 from pdf_report import generate_graphic_pdf
 
+# ---------------------------------
+# Data directory helper (shared)
+# ---------------------------------
+def get_data_dir() -> str:
+    try:
+        dd = st.secrets.get("DATA_DIR")
+        if dd:
+            os.makedirs(dd, exist_ok=True)
+            return dd
+    except Exception:
+        pass
+    dd = os.environ.get("DATA_DIR")
+    if dd:
+        os.makedirs(dd, exist_ok=True)
+        return dd
+    dd = os.path.join(os.getcwd(), "data")
+    os.makedirs(dd, exist_ok=True)
+    return dd
+
 
 # =========================================================
 # Fungsi Utama: Generate Graphic Report
@@ -20,7 +39,7 @@ def generate_graphic_report(show_pdf_button=True):
     # ============================================
     # Load Data
     # ============================================
-    data_path = Path.cwd() / "comparative_data.csv"
+    data_path = Path(get_data_dir()) / "comparative_data.csv"
     if not data_path.exists():
         st.error("❌ File 'comparative_data.csv' tidak ditemukan di folder project.")
         return
