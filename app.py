@@ -43,22 +43,22 @@ def _is_writable(dir_path: str) -> bool:
         return False
 
 def get_data_dir() -> str:
-    # Priority order for data directory resolution
-    # 1) Streamlit Cloud persistent storage (highest priority)
-    mount_dir = "/mount/data"
-    if _is_writable(mount_dir):
-        return mount_dir
-    # 2) Environment variable
-    env_dir = os.environ.get("DATA_DIR")
-    if env_dir and _is_writable(env_dir):
-        return env_dir
-    # 3) Streamlit secrets
+    # Priority order for data directory resolution (align with simple secrets-first pattern)
+    # 1) Streamlit secrets
     try:
         secrets_dir = st.secrets.get("DATA_DIR")  # type: ignore[attr-defined]
         if secrets_dir and _is_writable(secrets_dir):
             return secrets_dir
     except Exception:
         pass
+    # 2) Environment variable
+    env_dir = os.environ.get("DATA_DIR")
+    if env_dir and _is_writable(env_dir):
+        return env_dir
+    # 3) Streamlit Cloud persistent storage (common default)
+    mount_dir = "/mount/data"
+    if _is_writable(mount_dir):
+        return mount_dir
     # 4) Current working directory
     cwd_dir = os.path.join(os.getcwd(), "data")
     if _is_writable(cwd_dir):
@@ -624,7 +624,11 @@ nav = st.sidebar.radio("Pilih Tampilan:", ["Dashboard", "Graphic Report"], index
 st.sidebar.markdown("<div class='border-b border-emerald-300 my-2'></div>", unsafe_allow_html=True)
 
 if nav == "Graphic Report":
-    graphic_report.generate_graphic_report(show_pdf_button=True)
+    try:
+        graphic_report.generate_graphic_report(show_pdf_button=True)
+    except Exception as e:
+        st.error("❌ Terjadi error di halaman Graphic Report.")
+        st.exception(e)
 
 
 
