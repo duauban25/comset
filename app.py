@@ -139,16 +139,28 @@ required_cols = ['Date', 'Hotel', 'Room_Available', 'Room_Sold', 'ADR']
 # ===========================
 if os.path.exists(file_path):
     try:
-        df = pd.read_csv(file_path, parse_dates=['Date'])
-        st.success(f"✅ Data dimuat dari: {file_path} ({len(df)} records)")
+        # Check file size first
+        file_size = os.path.getsize(file_path)
+        st.info(f"📝 File size: {file_size} bytes")
+        
+        if file_size == 0:
+            st.warning("⚠️ File CSV kosong. Membuat struktur baru.")
+            df = pd.DataFrame(columns=required_cols)
+            df.to_csv(file_path, index=False)
+            st.success("✅ Struktur CSV berhasil dibuat.")
+        else:
+            df = pd.read_csv(file_path, parse_dates=['Date'])
+            st.success(f"✅ Data dimuat dari: {file_path} ({len(df)} records)")
     except Exception as e:
-        st.warning(f"⚠️ File CSV gagal dibaca: {e}. Membuat file baru kosong.")
+        st.error(f"❌ File CSV gagal dibaca: {type(e).__name__}: {str(e)}")
+        st.info("🔄 Mencoba membuat file baru...")
         df = pd.DataFrame(columns=required_cols)
         try:
             df.to_csv(file_path, index=False)
-            st.info("✅ File comparative_data.csv kosong berhasil dibuat.")
+            st.success("✅ File comparative_data.csv baru berhasil dibuat.")
         except Exception as write_err:
             st.error(f"❌ Gagal menulis CSV: {write_err}")
+            st.error(f"❌ Path: {file_path}")
             st.stop()
 else:
     st.info("📝 File comparative_data.csv tidak ditemukan. Membuat file baru...")
@@ -185,7 +197,7 @@ df["Room_Revenue"] = df["Room_Sold"] * df["ADR"]
 # (Opsional) Simpan hasil perhitungan ke file
 try:
     df.to_csv(file_path, index=False)
-    st.info("💾 Data berhasil diperbarui.")
+    # st.info("💾 Data berhasil diperbarui.")  # Comment out to reduce noise
 except Exception as e:
     st.error(f"❌ Gagal menyimpan pembaruan ke CSV: {e}")
     st.stop()
@@ -198,12 +210,20 @@ capacity_path = os.path.join(DATA_DIR, 'room_capacity.csv')
 #st.write(f"🔎 Mencari file di: {capacity_path}")
 if os.path.exists(capacity_path):
     try:
+        capacity_size = os.path.getsize(capacity_path)
+        if capacity_size == 0:
+            st.warning("⚠️ room_capacity.csv kosong. Akan dibuat ulang.")
+            raise FileNotFoundError("Empty file")
         capacity_df = pd.read_csv(capacity_path)
+        st.success(f"✅ Room capacity dimuat: {len(capacity_df)} hotels")
     except Exception as e:
-        st.warning(f"⚠️ Gagal membaca room_capacity.csv: {e}")
+        st.warning(f"⚠️ Gagal membaca room_capacity.csv: {e}. Membuat data sampel.")
         capacity_df = pd.DataFrame(columns=['Hotel', 'Room_Available'])
 else:
-    st.warning("⚠️ File 'room_capacity.csv' tidak ditemukan. Buat file tersebut dengan kolom Hotel dan Room_Available.")
+    st.info("📝 File 'room_capacity.csv' tidak ditemukan. Membuat data sampel...")
+    
+# Create sample capacity data (whether file missing or empty)
+if 'capacity_df' not in locals() or capacity_df.empty:
     sample_capacity = pd.DataFrame({
         'Hotel': ['Daun Bali Seminyak', "D'Prima Hotel Petitenget", 'Kamanya Petitenget',
                   'The Capital Seminyak', 'Paragon Seminyak', 'Liberta'],
@@ -211,13 +231,12 @@ else:
     })
     try:
         sample_capacity.to_csv(capacity_path, index=False)
-        st.success("✅ File 'room_capacity.csv' dibuat otomatis dengan data sampel.")
+        st.success("✅ File 'room_capacity.csv' dibuat dengan data sampel.")
         capacity_df = sample_capacity
     except Exception as e:
         st.error(f"❌ Gagal membuat room_capacity.csv: {e}")
         st.error(f"❌ Path: {capacity_path}")
-        st.error(f"❌ Directory: {DATA_DIR}")
-        capacity_df = pd.DataFrame(columns=['Hotel', 'Room_Available'])
+        capacity_df = sample_capacity  # Use in-memory version
 
 # Pastikan hotels_list selalu ada
 hotels_list = []
