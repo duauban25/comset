@@ -1,12 +1,12 @@
 import os
 import sys
-from pathlib import Path
 
-# Add the current directory to the path so local imports work
+# Ensure local imports work
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# Import the main app
-from app import main
+# Importing app will execute the Streamlit app since it runs at top-level
+import app  # noqa: F401
 
 if __name__ == "__main__":
-    main()
+    # Nothing needed; Streamlit runs on import
+    pass

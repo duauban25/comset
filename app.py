@@ -7,6 +7,7 @@ from pathlib import Path
 from pdf_report import generate_pdf_report
 import os, sys
 import graphic_report
+import tempfile
 
 # ===========================
 # 🔧 BUNDLING SUPPORT FUNCTION
@@ -23,10 +24,50 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 # ===========================
+# DATA DIRECTORY RESOLUTION
+# ===========================
+def _is_writable(dir_path: str) -> bool:
+    try:
+        os.makedirs(dir_path, exist_ok=True)
+        test_file = os.path.join(dir_path, ".write_test")
+        with open(test_file, "w") as f:
+            f.write("ok")
+        os.remove(test_file)
+        return True
+    except Exception:
+        return False
+
+def get_data_dir() -> str:
+    # 1) Env var
+    env_dir = os.environ.get("DATA_DIR")
+    if env_dir and _is_writable(env_dir):
+        return env_dir
+    # 2) Streamlit secrets
+    try:
+        secrets_dir = st.secrets.get("DATA_DIR")  # type: ignore[attr-defined]
+        if secrets_dir and _is_writable(secrets_dir):
+            return secrets_dir
+    except Exception:
+        pass
+    # 3) User Documents/compbaru
+    docs_dir = os.path.join(os.path.expanduser("~"), "Documents", "compbaru")
+    if _is_writable(docs_dir):
+        return docs_dir
+    # 4) Current working directory
+    cwd_dir = os.path.join(os.getcwd(), "data")
+    if _is_writable(cwd_dir):
+        return cwd_dir
+    # 5) Temp directory
+    tmp_dir = os.path.join(tempfile.gettempdir(), "compbaru")
+    os.makedirs(tmp_dir, exist_ok=True)
+    return tmp_dir
+
+# ===========================
 # CONFIG
 # ===========================
 logo_path = resource_path("Daun_logo.jpg")
-csv_path = resource_path("comparative_data.csv")
+DATA_DIR = get_data_dir()
+file_path = os.path.join(DATA_DIR, "comparative_data.csv")
 
 st.set_page_config(
     page_title="Comparative Statistic Dashboard (Modern)",
@@ -58,13 +99,6 @@ st.markdown("<div class='mx-auto max-w-screen-2xl px-4 py-2'>", unsafe_allow_htm
 # ===========================
 # LOAD & PREPARE DATA
 # ===========================
-
-file_path = os.path.expanduser('~/Documents/compbaru/comparative_data.csv')
-
-# Jika sedang dibundle (misalnya jadi .exe atau .app)
-if getattr(sys, 'frozen', False):
-    file_path = os.path.join(os.getcwd(), "comparative_data.csv")
-
 os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
 required_cols = ['Date', 'Hotel', 'Room_Available', 'Room_Sold', 'ADR']
@@ -113,7 +147,7 @@ except Exception as e:
 # ===========================
 # ROOM CAPACITY REFERENCE
 # ===========================
-capacity_path = os.path.expanduser('~/Documents/compbaru/room_capacity.csv')
+capacity_path = os.path.join(DATA_DIR, 'room_capacity.csv')
 
 #st.write(f"🔎 Mencari file di: {capacity_path}")
 if os.path.exists(capacity_path):
