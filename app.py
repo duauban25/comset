@@ -8,14 +8,9 @@ import os, sys
 import tempfile
 
 # ===========================
-# SAFE IMPORTS
+# IMPORTS (moved to main() to avoid module-level Streamlit calls)
 # ===========================
-try:
-    from pdf_report import generate_pdf_report
-    import graphic_report
-except ImportError as e:
-    st.error(f"❌ Import error: {e}")
-    st.stop()
+# pdf_report and graphic_report imported inside main()
 
 # ===========================
 # HELPER FUNCTIONS
@@ -143,6 +138,14 @@ def compute_metrics_table(df_all, up_to_date, period):
 # MAIN APP
 # ===========================
 def main():
+    # Import here to avoid module-level Streamlit calls
+    try:
+        from pdf_report import generate_pdf_report
+        import graphic_report
+    except ImportError as e:
+        st.error(f"❌ Import error: {e}")
+        st.stop()
+
     # CONFIG
     logo_path = resource_path("Daun_logo.jpg")
     DATA_DIR = get_data_dir()
@@ -448,5 +451,5 @@ def main():
     if nav == "Graphic Report":
         graphic_report.generate_graphic_report(show_pdf_button=True)
 
-if __name__ == "__main__":
-    main()
+# Run the app
+main()
