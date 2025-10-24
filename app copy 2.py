@@ -1,19 +1,9 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-from pathlib import Path
+from pdf_report import generate_pdf_report
 import os, sys
-import shutil
-import tempfile
-
-try:
-    from pdf_report import generate_pdf_report
-    import graphic_report
-except ImportError as e:
-    st.error(f"❌ Import error: {e}")
-    st.stop()
 
 # ===========================
 # 🔧 BUNDLING SUPPORT FUNCTION
@@ -30,234 +20,79 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 # ===========================
-# DATA DIRECTORY RESOLUTION
-# ===========================
-def _is_writable(dir_path: str) -> bool:
-    try:
-        os.makedirs(dir_path, exist_ok=True)
-        test_file = os.path.join(dir_path, ".write_test")
-        with open(test_file, "w") as f:
-            f.write("ok")
-        os.remove(test_file)
-        return True
-    except Exception:
-        return False
-
-def get_data_dir() -> str:
-    # Priority: fixed '/data' first (as requested)
-    fixed_dir = "/data"
-    if _is_writable(fixed_dir):
-        return fixed_dir
-    # Next: Streamlit secrets
-    try:
-        secrets_dir = st.secrets.get("DATA_DIR")  # type: ignore[attr-defined]
-        if secrets_dir and _is_writable(secrets_dir):
-            return secrets_dir
-    except Exception:
-        pass
-    # Next: Environment variable
-    env_dir = os.environ.get("DATA_DIR")
-    if env_dir and _is_writable(env_dir):
-        return env_dir
-    # Next: Streamlit Cloud persistent storage
-    mount_dir = "/mount/data"
-    if _is_writable(mount_dir):
-        return mount_dir
-    # Fallbacks
-    cwd_dir = os.path.join(os.getcwd(), "data")
-    if _is_writable(cwd_dir):
-        return cwd_dir
-    # User Documents/compbaru (local development fallback)
-    docs_dir = os.path.join(os.path.expanduser("~"), "Documents", "compbaru")
-    if _is_writable(docs_dir):
-        return docs_dir
-    # Temp directory (last resort)
-    tmp_dir = os.path.join(tempfile.gettempdir(), "compbaru")
-    os.makedirs(tmp_dir, exist_ok=True)
-    return tmp_dir
-
-# ===========================
 # CONFIG
 # ===========================
-logo_path = resource_path("Daun_logo.jpg")
-DATA_DIR = get_data_dir()
-file_path = os.path.join(DATA_DIR, "comparative_data.csv")
-capacity_path = os.path.join(DATA_DIR, 'room_capacity.csv')
+logo_path = resource_path("daun_logo.jpg")
+csv_path = resource_path("comparative_data.csv")
 
-def ensure_data_files(data_dir: str, comp_path: str, cap_path: str):
-    os.makedirs(data_dir, exist_ok=True)
-    repo_data_dir = os.path.join(os.path.dirname(__file__), 'data')
-    # Ensure comparative_data.csv
-    if not os.path.exists(comp_path):
-        src_csv = os.path.join(repo_data_dir, 'comparative_data.csv')
-        try:
-            if os.path.exists(src_csv):
-                shutil.copyfile(src_csv, comp_path)
-            else:
-                pd.DataFrame(columns=['Date','Hotel','Room_Available','Room_Sold','ADR','Room_Revenue']).to_csv(comp_path, index=False)
-        except Exception as e:
-            st.error(f"❌ Gagal membuat comparative_data.csv di {comp_path}: {e}")
-            st.stop()
-    # Ensure room_capacity.csv
-    if not os.path.exists(cap_path):
-        src_cap = os.path.join(repo_data_dir, 'room_capacity.csv')
-        try:
-            if os.path.exists(src_cap):
-                shutil.copyfile(src_cap, cap_path)
-            else:
-                pd.DataFrame({'Hotel': [], 'Room_Available': []}).to_csv(cap_path, index=False)
-        except Exception as e:
-            st.error(f"❌ Gagal membuat room_capacity.csv di {cap_path}: {e}")
-            st.stop()
-
-# Ensure both CSVs exist before proceeding
-ensure_data_files(DATA_DIR, file_path, capacity_path)
-
-icon_path = logo_path if os.path.exists(logo_path) else None
 st.set_page_config(
     page_title="Comparative Statistic Dashboard (Modern)",
-    page_icon=icon_path,
+    page_icon=logo_path,
     layout="wide"
 )
-try:
-    components.html("""
-    <script src="https://cdn.tailwindcss.com"></script>
-    """, height=0)
-except Exception:
-    # Ignore if CDN blocked on platform
-    pass
 col1, col2 = st.columns([1, 3])
 with col1:
     if os.path.exists(logo_path):
         st.image(logo_path, width=80)
 with col2:
-    st.markdown(
-        """
-        <div class="pt-2">
-          <h2 class="text-2xl font-semibold text-emerald-800">CompSet Dashboard — Daun Bali Seminyak</h2>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-st.markdown("<div class='my-3 border-b border-emerald-300'></div>", unsafe_allow_html=True)
+    st.markdown("<h3 style='padding-top: 8px;'>CompSet Dashboard — Daun Bali Seminyak</h3>", unsafe_allow_html=True)
+st.markdown('---')
 st.markdown("""
-<h3 class="text-lg font-semibold text-emerald-800 mb-2">🖨️ Export Comparative Report to PDF</h3>
+<p style='font-size:14px; color:#2E7D32; margin-bottom:0;'>
+🖨️ <b>Export Comparative Report to PDF</b>
+</p>
 """, unsafe_allow_html=True)
-st.markdown("<div class='mx-auto max-w-screen-2xl px-4 py-2'>", unsafe_allow_html=True)
-
-
+            
 # ===========================
 # LOAD & PREPARE DATA
 # ===========================
-os.makedirs(os.path.dirname(file_path), exist_ok=True)
+file_path = os.path.expanduser('~/Documents/compbaru/comparative_data.csv')
+# Jika sedang dibundle, arahkan file data ke direktori kerja saat ini
+if getattr(sys, 'frozen', False):
+    file_path = os.path.join(os.getcwd(), "comparative_data.csv")
 
+os.makedirs(os.path.dirname(file_path), exist_ok=True)
 required_cols = ['Date', 'Hotel', 'Room_Available', 'Room_Sold', 'ADR']
 
-# ===========================
-# Baca File CSV
-# ===========================
 if os.path.exists(file_path):
     try:
-        # Check file size first
-        file_size = os.path.getsize(file_path)
-        st.info(f"📝 File size: {file_size} bytes")
-        
-        if file_size == 0:
-            st.warning("⚠️ File CSV kosong. Membuat struktur baru.")
-            df = pd.DataFrame(columns=required_cols)
-            df.to_csv(file_path, index=False)
-            st.success("✅ Struktur CSV berhasil dibuat.")
-        else:
-            df = pd.read_csv(file_path, parse_dates=['Date'])
-            st.success(f"✅ Data dimuat dari: {file_path} ({len(df)} records)")
-    except Exception as e:
-        st.error(f"❌ File CSV gagal dibaca: {type(e).__name__}: {str(e)}")
-        st.info("🔄 Mencoba membuat file baru...")
+        df = pd.read_csv(file_path, parse_dates=['Date'])
+    except Exception:
+        st.warning("⚠️ File CSV gagal dibaca. Membuat file baru.")
         df = pd.DataFrame(columns=required_cols)
-        try:
-            df.to_csv(file_path, index=False)
-            st.success("✅ File comparative_data.csv baru berhasil dibuat.")
-        except Exception as write_err:
-            st.error(f"❌ Gagal menulis CSV: {write_err}")
-            st.error(f"❌ Path: {file_path}")
-            st.stop()
-else:
-    st.info("📝 File comparative_data.csv tidak ditemukan. Membuat file baru...")
-    df = pd.DataFrame(columns=required_cols)
-    try:
         df.to_csv(file_path, index=False)
-        st.success("✅ File comparative_data.csv berhasil dibuat.")
-    except Exception as e:
-        st.error(f"❌ Gagal membuat file CSV: {e}")
-        st.error(f"❌ Path: {file_path}")
-        st.error(f"❌ Directory: {DATA_DIR}")
-        st.stop()
+else:
+    df = pd.DataFrame(columns=required_cols)
+    df.to_csv(file_path, index=False)
 
-# Pastikan semua kolom wajib ada
 for c in required_cols:
     if c not in df.columns:
         df[c] = None
 
-# Pastikan kolom tanggal valid
 df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 if df["Date"].isnull().all():
     st.warning("⚠️ Tidak ada data tanggal valid di file CSV kamu. Pastikan kolom 'Date' berformat tanggal.")
-
-# ===========================
-# 🔄 Hitung Otomatis Room_Revenue
-# ===========================
-# Konversi ke angka agar tidak error
-df["Room_Sold"] = pd.to_numeric(df.get("Room_Sold", 0), errors="coerce").fillna(0)
-df["ADR"] = pd.to_numeric(df.get("ADR", 0), errors="coerce").fillna(0)
-
-# Hitung otomatis Room_Revenue setiap kali file dibuka
-df["Room_Revenue"] = df["Room_Sold"] * df["ADR"]
-
-# (Opsional) Simpan hasil perhitungan ke file
-try:
-    df.to_csv(file_path, index=False)
-    # st.info("💾 Data berhasil diperbarui.")  # Comment out to reduce noise
-except Exception as e:
-    st.error(f"❌ Gagal menyimpan pembaruan ke CSV: {e}")
-    st.stop()
+else:
+    if "Room_Revenue" not in df.columns:
+        df["Room_Revenue"] = df["Room_Sold"] * df["ADR"]
 
 # ===========================
 # ROOM CAPACITY REFERENCE
 # ===========================
-capacity_path = os.path.join(DATA_DIR, 'room_capacity.csv')
+capacity_path = os.path.expanduser('~/Documents/compbaru/room_capacity.csv')
 
 #st.write(f"🔎 Mencari file di: {capacity_path}")
 if os.path.exists(capacity_path):
     try:
-        capacity_size = os.path.getsize(capacity_path)
-        if capacity_size == 0:
-            st.warning("⚠️ room_capacity.csv kosong. Akan dibuat ulang.")
-            raise FileNotFoundError("Empty file")
         capacity_df = pd.read_csv(capacity_path)
-        st.success(f"✅ Room capacity dimuat: {len(capacity_df)} hotels")
     except Exception as e:
-        st.warning(f"⚠️ Gagal membaca room_capacity.csv: {e}. Membuat data sampel.")
+        st.warning(f"⚠️ Gagal membaca room_capacity.csv: {e}")
         capacity_df = pd.DataFrame(columns=['Hotel', 'Room_Available'])
 else:
-    st.info("📝 File 'room_capacity.csv' tidak ditemukan. Membuat data sampel...")
-    
-# Create sample capacity data (whether file missing or empty)
-if 'capacity_df' not in locals() or capacity_df.empty:
-    sample_capacity = pd.DataFrame({
-        'Hotel': ['Daun Bali Seminyak', "D'Prima Hotel Petitenget", 'Kamanya Petitenget',
-                  'The Capital Seminyak', 'Paragon Seminyak', 'Liberta'],
-        'Room_Available': [100, 50, 75, 120, 80, 60]
-    })
-    try:
-        sample_capacity.to_csv(capacity_path, index=False)
-        st.success("✅ File 'room_capacity.csv' dibuat dengan data sampel.")
-        capacity_df = sample_capacity
-    except Exception as e:
-        st.error(f"❌ Gagal membuat room_capacity.csv: {e}")
-        st.error(f"❌ Path: {capacity_path}")
-        capacity_df = sample_capacity  # Use in-memory version
+    st.warning("⚠️ File 'room_capacity.csv' tidak ditemukan. Buat file tersebut dengan kolom Hotel dan Room_Available.")
+    capacity_df = pd.DataFrame(columns=['Hotel', 'Room_Available'])
 
-# Pastikan hotels_list selalu ada
+    # Pastikan hotels_list selalu ada
 hotels_list = []
 
 if not df.empty and 'Hotel' in df.columns:
@@ -314,25 +149,12 @@ uploaded_file = st.sidebar.file_uploader("Pilih file CSV/Excel", type=['csv', 'x
 if uploaded_file is not None:
     try:
         if uploaded_file.name.endswith('.csv'):
-            new_df = pd.read_csv(uploaded_file)
+            new_df = pd.read_csv(uploaded_file, parse_dates=['Date'], dayfirst=True)
         else:
-            new_df = pd.read_excel(uploaded_file)
-
-        missing = [c for c in required_cols if c not in new_df.columns]
-        if missing:
-            st.error(f"❌ Kolom wajib hilang pada file upload: {', '.join(missing)}")
-        else:
-            # Normalisasi tipe data
-            new_df['Date'] = pd.to_datetime(new_df['Date'], errors='coerce')
-            new_df['Room_Sold'] = pd.to_numeric(new_df.get('Room_Sold', 0), errors='coerce').fillna(0)
-            new_df['ADR'] = pd.to_numeric(new_df.get('ADR', 0), errors='coerce').fillna(0)
-            # Hitung Room_Revenue jika belum ada
-            if 'Room_Revenue' not in new_df.columns:
-                new_df['Room_Revenue'] = new_df['Room_Sold'] * new_df['ADR']
-
-            df = pd.concat([df, new_df], ignore_index=True)
-            df.to_csv(file_path, index=False)
-            st.success(f"✅ File '{uploaded_file.name}' berhasil diunggah dan digabung ke database.")
+            new_df = pd.read_excel(uploaded_file, parse_dates=['Date'])
+        df = pd.concat([df, new_df], ignore_index=True)
+        df.to_csv(file_path, index=False)
+        st.success(f"✅ File '{uploaded_file.name}' berhasil diunggah dan digabung ke database.")
     except Exception as e:
         st.error(f"❌ Gagal membaca file: {e}")
 
@@ -420,20 +242,16 @@ if not df.empty:
     🗓️ <b>Pilih Tanggal untuk Generate PDF</b>
     </p>
     """, unsafe_allow_html=True)
-    st.markdown("<div class='bg-white rounded-xl border border-emerald-200 shadow-sm p-4 md:p-6 mb-6'>", unsafe_allow_html=True)
 
     all_dates = sorted(df["Date"].dropna().unique(), reverse=False)
     if len(all_dates) == 0:
         st.info("Tidak ada tanggal valid di dataset.")
     else:
-        min_date = pd.to_datetime(all_dates[0]).date()
-        max_date = pd.to_datetime(all_dates[-1]).date()
-        last_date = max_date
-        selected_date = st.date_input(
-            "📅 Pilih tanggal:",
-            value=last_date,
-            min_value=min_date,
-            max_value=max_date
+        selected_date = st.selectbox(
+            "Pilih tanggal:",
+            all_dates,
+            index=len(all_dates) - 1,
+            format_func=lambda x: pd.to_datetime(x).strftime("%d %B %Y")
         )
 
         summary_data = {
@@ -464,8 +282,6 @@ if not df.empty:
             except Exception as e:
                 st.error(f"❌ Terjadi error saat membuat PDF: {e}")
 
-        st.markdown("</div>", unsafe_allow_html=True)
-
 
 
 # ===========================
@@ -478,21 +294,11 @@ if not df.empty:
         selected_date_str = selected_date_ts.strftime('%d %B %Y')  # contoh: 09 Oktober 2025
 
         table_df = compute_metrics_table(df, selected_date_ts, p)
-        st.markdown("<div class='bg-white rounded-xl border border-emerald-200 shadow-sm p-4 md:p-6 mb-6'>", unsafe_allow_html=True)
-        st.markdown(f"<h3 class='text-lg font-semibold text-emerald-800 mb-3'>{title} — {selected_date_str}</h3>", unsafe_allow_html=True)
+        st.markdown('---')
+        st.subheader(f"{title} — {selected_date_str}")
 
 
         table_df_formatted = table_df.copy()
-        badges = []
-        for _, row in table_df.iterrows():
-            if row.get('Hotel') == 'TOTAL':
-                badges.append('Σ TOTAL')
-            elif row.get('Rank') == 1:
-                badges.append('🏆 TOP')
-            else:
-                badges.append('')
-        # Sisipkan kolom Badge di posisi awal
-        table_df_formatted.insert(0, 'Badge', badges)
         for col in ['Room_Available', 'Room_Sold']:
             table_df_formatted[col] = table_df_formatted[col].map('{:,.0f}'.format)
         for col in ['Revenue']:
@@ -526,24 +332,22 @@ if not df.empty:
         ])
         fig.update_layout(margin=dict(l=5, r=5, t=5, b=5), height=380)
         st.plotly_chart(fig, use_container_width=True, key=f"chart_{p}")
-        st.markdown("</div>", unsafe_allow_html=True)
 
 # ===========================
 # RAW DATA VIEW
 # ===========================
-st.markdown("<div class='bg-white rounded-xl border border-emerald-200 shadow-sm p-4 md:p-6 mb-6'>", unsafe_allow_html=True)
-st.markdown("<h3 class='text-lg font-semibold text-emerald-800 mb-3'>📋 Database (Raw Data)</h3>", unsafe_allow_html=True)
+st.markdown('---')
+st.subheader('📋 Database (Raw Data)')
 st.dataframe(df.sort_values('Date', ascending=False))
 csv_data = df.to_csv(index=False).encode('utf-8')
 st.download_button(label='💾 Unduh Data CSV', data=csv_data, file_name='comparative_data.csv', mime='text/csv')
 st.caption('Dashboard modern dengan baris TOTAL, Rank, dan highlight RevPAR tertinggi.')
-st.markdown("</div>", unsafe_allow_html=True)
 
 # ===========================
 # EDIT / DELETE DATA SECTION
 # ===========================
-st.markdown("<div class='bg-white rounded-xl border border-emerald-200 shadow-sm p-4 md:p-6 mb-6'>", unsafe_allow_html=True)
-st.markdown("<h3 class='text-lg font-semibold text-emerald-800 mb-3'>✏️ Edit atau Hapus Data</h3>", unsafe_allow_html=True)
+st.markdown('---')
+st.subheader("✏️ Edit atau Hapus Data")
 
 if not df.empty:
     df_sorted = df.sort_values("Date", ascending=False)
@@ -577,14 +381,15 @@ if not df.empty:
                 st.warning("⚠️ Data telah dihapus. Silakan refresh halaman.")
 else:
     st.info("Belum ada data untuk diedit.")
-st.markdown("</div>", unsafe_allow_html=True)
 
 
 
 # ============================================
 # PDF Report Button (Versi Aman & Download)
 # ============================================
- 
+from datetime import datetime
+import os
+from pathlib import Path
 
 def render_pdf_button(summary, show_pdf_button=True):
     """
@@ -632,36 +437,20 @@ def render_pdf_button(summary, show_pdf_button=True):
 
 
 
-# Tutup container utama
-st.markdown("</div>", unsafe_allow_html=True)
-
-# ===============================================
-# app.py — Aplikasi utama Streamlit
-# ===============================================
-st.sidebar.title("📍 Navigation")
-nav = st.sidebar.radio("Pilih Tampilan:", ["Dashboard", "Graphic Report"], index=0)
-st.sidebar.markdown("<div class='border-b border-emerald-300 my-2'></div>", unsafe_allow_html=True)
-
-if nav == "Graphic Report":
-    try:
-        graphic_report.generate_graphic_report(show_pdf_button=True)
-    except Exception as e:
-        st.error("❌ Terjadi error di halaman Graphic Report.")
-        st.exception(e)
 
 
 
 # -----------------------------------------------
 # TOMBOL UNTUK GRAPHIC REPORT
 # -----------------------------------------------
-#import graphic_report  # pastikan file ada di folder yang sama
+import graphic_report  # pastikan file ada di folder yang sama
 
-#st.markdown("---")
-#if st.button("📊 Open Graphic Dashboard"):
-#    st.session_state["show_graphic"] = True
+st.markdown("---")
+if st.button("📊 Open Graphic Dashboard"):
+    st.session_state["show_graphic"] = True
 
-#if st.session_state.get("show_graphic", False):
-#    graphic_report.generate_graphic_report(show_pdf_button=True)
+if st.session_state.get("show_graphic", False):
+    graphic_report.generate_graphic_report(show_pdf_button=True)
 
 
 

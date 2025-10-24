@@ -5,7 +5,6 @@ import plotly.graph_objects as go
 from datetime import datetime
 from pathlib import Path
 import os, sys
-import shutil
 import tempfile
 
 try:
@@ -44,34 +43,26 @@ def _is_writable(dir_path: str) -> bool:
         return False
 
 def get_data_dir() -> str:
-    # Priority: fixed '/data' first (as requested)
-    fixed_dir = "/data"
-    if _is_writable(fixed_dir):
-        return fixed_dir
-    # Next: Streamlit secrets
+    # 1) Env var
+    env_dir = os.environ.get("DATA_DIR")
+    if env_dir and _is_writable(env_dir):
+        return env_dir
+    # 2) Streamlit secrets
     try:
         secrets_dir = st.secrets.get("DATA_DIR")  # type: ignore[attr-defined]
         if secrets_dir and _is_writable(secrets_dir):
             return secrets_dir
     except Exception:
         pass
-    # Next: Environment variable
-    env_dir = os.environ.get("DATA_DIR")
-    if env_dir and _is_writable(env_dir):
-        return env_dir
-    # Next: Streamlit Cloud persistent storage
-    mount_dir = "/mount/data"
-    if _is_writable(mount_dir):
-        return mount_dir
-    # Fallbacks
-    cwd_dir = os.path.join(os.getcwd(), "data")
-    if _is_writable(cwd_dir):
-        return cwd_dir
-    # User Documents/compbaru (local development fallback)
+    # 3) User Documents/compbaru
     docs_dir = os.path.join(os.path.expanduser("~"), "Documents", "compbaru")
     if _is_writable(docs_dir):
         return docs_dir
-    # Temp directory (last resort)
+    # 4) Current working directory
+    cwd_dir = os.path.join(os.getcwd(), "data")
+    if _is_writable(cwd_dir):
+        return cwd_dir
+    # 5) Temp directory
     tmp_dir = os.path.join(tempfile.gettempdir(), "compbaru")
     os.makedirs(tmp_dir, exist_ok=True)
     return tmp_dir
@@ -82,36 +73,6 @@ def get_data_dir() -> str:
 logo_path = resource_path("Daun_logo.jpg")
 DATA_DIR = get_data_dir()
 file_path = os.path.join(DATA_DIR, "comparative_data.csv")
-capacity_path = os.path.join(DATA_DIR, 'room_capacity.csv')
-
-def ensure_data_files(data_dir: str, comp_path: str, cap_path: str):
-    os.makedirs(data_dir, exist_ok=True)
-    repo_data_dir = os.path.join(os.path.dirname(__file__), 'data')
-    # Ensure comparative_data.csv
-    if not os.path.exists(comp_path):
-        src_csv = os.path.join(repo_data_dir, 'comparative_data.csv')
-        try:
-            if os.path.exists(src_csv):
-                shutil.copyfile(src_csv, comp_path)
-            else:
-                pd.DataFrame(columns=['Date','Hotel','Room_Available','Room_Sold','ADR','Room_Revenue']).to_csv(comp_path, index=False)
-        except Exception as e:
-            st.error(f"❌ Gagal membuat comparative_data.csv di {comp_path}: {e}")
-            st.stop()
-    # Ensure room_capacity.csv
-    if not os.path.exists(cap_path):
-        src_cap = os.path.join(repo_data_dir, 'room_capacity.csv')
-        try:
-            if os.path.exists(src_cap):
-                shutil.copyfile(src_cap, cap_path)
-            else:
-                pd.DataFrame({'Hotel': [], 'Room_Available': []}).to_csv(cap_path, index=False)
-        except Exception as e:
-            st.error(f"❌ Gagal membuat room_capacity.csv di {cap_path}: {e}")
-            st.stop()
-
-# Ensure both CSVs exist before proceeding
-ensure_data_files(DATA_DIR, file_path, capacity_path)
 
 icon_path = logo_path if os.path.exists(logo_path) else None
 st.set_page_config(
@@ -144,8 +105,7 @@ st.markdown("""
 <h3 class="text-lg font-semibold text-emerald-800 mb-2">🖨️ Export Comparative Report to PDF</h3>
 """, unsafe_allow_html=True)
 st.markdown("<div class='mx-auto max-w-screen-2xl px-4 py-2'>", unsafe_allow_html=True)
-
-
+            
 # ===========================
 # LOAD & PREPARE DATA
 # ===========================
@@ -158,40 +118,14 @@ required_cols = ['Date', 'Hotel', 'Room_Available', 'Room_Sold', 'ADR']
 # ===========================
 if os.path.exists(file_path):
     try:
-        # Check file size first
-        file_size = os.path.getsize(file_path)
-        st.info(f"📝 File size: {file_size} bytes")
-        
-        if file_size == 0:
-            st.warning("⚠️ File CSV kosong. Membuat struktur baru.")
-            df = pd.DataFrame(columns=required_cols)
-            df.to_csv(file_path, index=False)
-            st.success("✅ Struktur CSV berhasil dibuat.")
-        else:
-            df = pd.read_csv(file_path, parse_dates=['Date'])
-            st.success(f"✅ Data dimuat dari: {file_path} ({len(df)} records)")
-    except Exception as e:
-        st.error(f"❌ File CSV gagal dibaca: {type(e).__name__}: {str(e)}")
-        st.info("🔄 Mencoba membuat file baru...")
+        df = pd.read_csv(file_path, parse_dates=['Date'])
+    except Exception:
+        st.warning("⚠️ File CSV gagal dibaca. Membuat file baru kosong.")
         df = pd.DataFrame(columns=required_cols)
-        try:
-            df.to_csv(file_path, index=False)
-            st.success("✅ File comparative_data.csv baru berhasil dibuat.")
-        except Exception as write_err:
-            st.error(f"❌ Gagal menulis CSV: {write_err}")
-            st.error(f"❌ Path: {file_path}")
-            st.stop()
-else:
-    st.info("📝 File comparative_data.csv tidak ditemukan. Membuat file baru...")
-    df = pd.DataFrame(columns=required_cols)
-    try:
         df.to_csv(file_path, index=False)
-        st.success("✅ File comparative_data.csv berhasil dibuat.")
-    except Exception as e:
-        st.error(f"❌ Gagal membuat file CSV: {e}")
-        st.error(f"❌ Path: {file_path}")
-        st.error(f"❌ Directory: {DATA_DIR}")
-        st.stop()
+else:
+    df = pd.DataFrame(columns=required_cols)
+    df.to_csv(file_path, index=False)
 
 # Pastikan semua kolom wajib ada
 for c in required_cols:
@@ -216,10 +150,9 @@ df["Room_Revenue"] = df["Room_Sold"] * df["ADR"]
 # (Opsional) Simpan hasil perhitungan ke file
 try:
     df.to_csv(file_path, index=False)
-    # st.info("💾 Data berhasil diperbarui.")  # Comment out to reduce noise
 except Exception as e:
     st.error(f"❌ Gagal menyimpan pembaruan ke CSV: {e}")
-    st.stop()
+
 
 # ===========================
 # ROOM CAPACITY REFERENCE
@@ -229,35 +162,15 @@ capacity_path = os.path.join(DATA_DIR, 'room_capacity.csv')
 #st.write(f"🔎 Mencari file di: {capacity_path}")
 if os.path.exists(capacity_path):
     try:
-        capacity_size = os.path.getsize(capacity_path)
-        if capacity_size == 0:
-            st.warning("⚠️ room_capacity.csv kosong. Akan dibuat ulang.")
-            raise FileNotFoundError("Empty file")
         capacity_df = pd.read_csv(capacity_path)
-        st.success(f"✅ Room capacity dimuat: {len(capacity_df)} hotels")
     except Exception as e:
-        st.warning(f"⚠️ Gagal membaca room_capacity.csv: {e}. Membuat data sampel.")
+        st.warning(f"⚠️ Gagal membaca room_capacity.csv: {e}")
         capacity_df = pd.DataFrame(columns=['Hotel', 'Room_Available'])
 else:
-    st.info("📝 File 'room_capacity.csv' tidak ditemukan. Membuat data sampel...")
-    
-# Create sample capacity data (whether file missing or empty)
-if 'capacity_df' not in locals() or capacity_df.empty:
-    sample_capacity = pd.DataFrame({
-        'Hotel': ['Daun Bali Seminyak', "D'Prima Hotel Petitenget", 'Kamanya Petitenget',
-                  'The Capital Seminyak', 'Paragon Seminyak', 'Liberta'],
-        'Room_Available': [100, 50, 75, 120, 80, 60]
-    })
-    try:
-        sample_capacity.to_csv(capacity_path, index=False)
-        st.success("✅ File 'room_capacity.csv' dibuat dengan data sampel.")
-        capacity_df = sample_capacity
-    except Exception as e:
-        st.error(f"❌ Gagal membuat room_capacity.csv: {e}")
-        st.error(f"❌ Path: {capacity_path}")
-        capacity_df = sample_capacity  # Use in-memory version
+    st.warning("⚠️ File 'room_capacity.csv' tidak ditemukan. Buat file tersebut dengan kolom Hotel dan Room_Available.")
+    capacity_df = pd.DataFrame(columns=['Hotel', 'Room_Available'])
 
-# Pastikan hotels_list selalu ada
+    # Pastikan hotels_list selalu ada
 hotels_list = []
 
 if not df.empty and 'Hotel' in df.columns:
@@ -643,11 +556,7 @@ nav = st.sidebar.radio("Pilih Tampilan:", ["Dashboard", "Graphic Report"], index
 st.sidebar.markdown("<div class='border-b border-emerald-300 my-2'></div>", unsafe_allow_html=True)
 
 if nav == "Graphic Report":
-    try:
-        graphic_report.generate_graphic_report(show_pdf_button=True)
-    except Exception as e:
-        st.error("❌ Terjadi error di halaman Graphic Report.")
-        st.exception(e)
+    graphic_report.generate_graphic_report(show_pdf_button=True)
 
 
 
