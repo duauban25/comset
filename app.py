@@ -313,28 +313,36 @@ st.sidebar.subheader("📤 Upload CSV/Excel")
 uploaded_file = st.sidebar.file_uploader("Pilih file CSV/Excel", type=['csv', 'xlsx'])
 if uploaded_file is not None:
     try:
-        if uploaded_file.name.endswith('.csv'):
-            new_df = pd.read_csv(uploaded_file)
+        upload_dir = os.path.join(DATA_DIR, "uploads")
+        os.makedirs(upload_dir, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base, ext = os.path.splitext(uploaded_file.name)
+        safe_name = f"{base}_{ts}{ext}"
+        saved_path = os.path.join(upload_dir, safe_name)
+        with open(saved_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        st.sidebar.success(f"📂 Tersimpan otomatis: {saved_path}")
+
+        if ext.lower() == '.csv':
+            new_df = pd.read_csv(saved_path)
         else:
-            new_df = pd.read_excel(uploaded_file)
+            new_df = pd.read_excel(saved_path)
 
         missing = [c for c in required_cols if c not in new_df.columns]
         if missing:
             st.error(f"❌ Kolom wajib hilang pada file upload: {', '.join(missing)}")
         else:
-            # Normalisasi tipe data
             new_df['Date'] = pd.to_datetime(new_df['Date'], errors='coerce')
             new_df['Room_Sold'] = pd.to_numeric(new_df.get('Room_Sold', 0), errors='coerce').fillna(0)
             new_df['ADR'] = pd.to_numeric(new_df.get('ADR', 0), errors='coerce').fillna(0)
-            # Hitung Room_Revenue jika belum ada
             if 'Room_Revenue' not in new_df.columns:
                 new_df['Room_Revenue'] = new_df['Room_Sold'] * new_df['ADR']
 
             df = pd.concat([df, new_df], ignore_index=True)
             df.to_csv(file_path, index=False)
-            st.success(f"✅ File '{uploaded_file.name}' berhasil diunggah dan digabung ke database.")
+            st.success(f"✅ File '{uploaded_file.name}' berhasil diunggah, disimpan, dan digabung ke database.")
     except Exception as e:
-        st.error(f"❌ Gagal membaca file: {e}")
+        st.error(f"❌ Gagal memproses file: {e}")
 
 # ===========================
 # AGGREGATION & METRICS
