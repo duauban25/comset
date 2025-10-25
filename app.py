@@ -198,6 +198,9 @@ for c in required_cols:
 
 # Pastikan kolom tanggal valid
 df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+# Normalisasi nama hotel: trim dan rapikan spasi berlebih
+if 'Hotel' in df.columns:
+    df['Hotel'] = df['Hotel'].astype(str).apply(lambda x: ' '.join(x.split()))
 if df["Date"].isnull().all():
     st.warning("⚠️ Tidak ada data tanggal valid di file CSV kamu. Pastikan kolom 'Date' berformat tanggal.")
 
@@ -289,9 +292,10 @@ with st.sidebar.form('input_form'):
     submitted = st.form_submit_button('Tambah Data')
 
     if submitted:
+        # Normalisasi nama hotel untuk mencegah duplikasi karena spasi
         new = pd.DataFrame({
             'Date': [pd.Timestamp(input_date)],
-            'Hotel': [input_hotel],
+            'Hotel': [' '.join(str(input_hotel).split())],
             'Room_Available': [input_room_available],
             'Room_Sold': [int(input_room_sold)],
             'ADR': [float(input_adr)]
@@ -334,6 +338,9 @@ if uploaded_file is not None:
             new_df['ADR'] = pd.to_numeric(new_df.get('ADR', 0), errors='coerce').fillna(0)
             if 'Room_Revenue' not in new_df.columns:
                 new_df['Room_Revenue'] = new_df['Room_Sold'] * new_df['ADR']
+            # Normalisasi nama hotel untuk mencegah duplikasi karena spasi
+            if 'Hotel' in new_df.columns:
+                new_df['Hotel'] = new_df['Hotel'].astype(str).apply(lambda x: ' '.join(x.split()))
 
             df = pd.concat([df, new_df], ignore_index=True)
             df.to_csv(file_path, index=False)
@@ -347,7 +354,11 @@ if uploaded_file is not None:
 def aggregate_period(df_all, up_to_date=None, period='last'):
     if df_all.empty:
         return pd.DataFrame()
+    df_all = df_all.copy()
     df_all['Date'] = pd.to_datetime(df_all['Date'], errors='coerce')
+    # Normalisasi nama hotel kembali sebagai guardrail saat agregasi
+    if 'Hotel' in df_all.columns:
+        df_all['Hotel'] = df_all['Hotel'].astype(str).apply(lambda x: ' '.join(x.split()))
     up_to = pd.Timestamp(up_to_date)
 
     if period == 'last':
