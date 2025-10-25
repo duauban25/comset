@@ -10,33 +10,43 @@ from datetime import datetime
 from pdf_report import generate_graphic_pdf
 
 # ---------------------------------
-# Data directory helper (shared)
+# Data directory helper (robust)
 # ---------------------------------
+def _is_writable(dir_path: str) -> bool:
+    try:
+        os.makedirs(dir_path, exist_ok=True)
+        test_file = os.path.join(dir_path, ".write_test")
+        with open(test_file, "w") as f:
+            f.write("ok")
+        os.remove(test_file)
+        return True
+    except Exception:
+        return False
+
 def get_data_dir() -> str:
-    # Prefer fixed '/data' if writable
-    fixed = "/data"
+    # 1) Fixed '/data'
+    fixed_dir = "/data"
+    if _is_writable(fixed_dir):
+        return fixed_dir
+    # 2) Streamlit secrets
     try:
-        os.makedirs(fixed, exist_ok=True)
-        return fixed
+        secrets_dir = st.secrets.get("DATA_DIR")  # type: ignore[attr-defined]
+        if secrets_dir and _is_writable(secrets_dir):
+            return secrets_dir
     except Exception:
         pass
-    # Then try secrets
-    try:
-        dd = st.secrets.get("DATA_DIR")
-        if dd:
-            os.makedirs(dd, exist_ok=True)
-            return dd
-    except Exception:
-        pass
-    # Then env var
-    dd = os.environ.get("DATA_DIR")
-    if dd:
-        os.makedirs(dd, exist_ok=True)
-        return dd
-    # Fallback to local ./data
-    dd = os.path.join(os.getcwd(), "data")
-    os.makedirs(dd, exist_ok=True)
-    return dd
+    # 3) Environment variable
+    env_dir = os.environ.get("DATA_DIR")
+    if env_dir and _is_writable(env_dir):
+        return env_dir
+    # 4) Streamlit Cloud persistent storage
+    mount_dir = "/mount/data"
+    if _is_writable(mount_dir):
+        return mount_dir
+    # 5) Fallback: project ./data
+    local_dir = os.path.join(os.getcwd(), "data")
+    os.makedirs(local_dir, exist_ok=True)
+    return local_dir
 
 
 # =========================================================
@@ -49,7 +59,7 @@ def generate_graphic_report(show_pdf_button=True):
     # ============================================
     # Load Data
     # ============================================
-    data_path = Path(get_data_dir()) / "comparative_data.csv"
+    data_path = Path(get_data_dir()) / "/data/comparative_data.csv"
     if not data_path.exists():
         st.error("❌ File 'comparative_data.csv' tidak ditemukan di folder project.")
         return
