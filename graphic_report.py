@@ -59,7 +59,7 @@ def generate_graphic_report(show_pdf_button=True):
     # ============================================
     # Load Data
     # ============================================
-    data_path = Path(get_data_dir()) / "/data/comparative_data.csv"
+    data_path = Path(get_data_dir()) / "/comset/data/comparative_data.csv"
     if not data_path.exists():
         st.error("❌ File 'comparative_data.csv' tidak ditemukan di folder project.")
         return
