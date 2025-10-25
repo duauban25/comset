@@ -151,10 +151,11 @@ def generate_graphic_report(show_pdf_button=True):
 
     occ_chart = (
         alt.Chart(summary)
-        .mark_bar(color="#1f77b4")
+        .mark_bar()
         .encode(
             x=alt.X("Hotel:N", title="Hotel"),
-            y=alt.Y("Occupancy:Q", title="Occupancy (%)")
+            y=alt.Y("Occupancy:Q", title="Occupancy (%)"),
+            color=alt.Color("Hotel:N", scale=alt.Scale(scheme="tableau10"), legend=None)
         )
         .properties(height=300)
     )
@@ -178,10 +179,11 @@ def generate_graphic_report(show_pdf_button=True):
     st.markdown("### 💰 Revenue vs Total Compset Revenue")
     rev_chart = (
         alt.Chart(summary)
-        .mark_bar(color="#2ca02c")
+        .mark_bar()
         .encode(
             x=alt.X("Hotel:N", title="Hotel"),
-            y=alt.Y("Room_Revenue:Q", title="Revenue (IDR)")
+            y=alt.Y("Room_Revenue:Q", title="Revenue (IDR)"),
+            color=alt.Color("Hotel:N", scale=alt.Scale(scheme="tableau10"), legend=None)
         )
         .properties(height=300)
     )
@@ -215,7 +217,6 @@ def generate_graphic_report(show_pdf_button=True):
         )
         .properties(height=300)
     )
-    # Garis pembanding 100% per indeks (MPI/ARI/RGI) agar sewarna dengan bar dan legenda bersama
     bench_df = pd.DataFrame({"Index": ["MPI", "ARI", "RGI"], "Value": [100.0, 100.0, 100.0]})
     idx_line = (
         alt.Chart(bench_df)
@@ -240,10 +241,11 @@ def generate_graphic_report(show_pdf_button=True):
     st.markdown("### 🌍 Market Fair Share (%)")
     fair_chart = (
         alt.Chart(summary)
-        .mark_bar(color="#ff7f0e")
+        .mark_bar()
         .encode(
             x=alt.X("Hotel:N"),
-            y=alt.Y("Market_Fair_Share:Q", title="Market Fair Share (%)")
+            y=alt.Y("Market_Fair_Share:Q", title="Market Fair Share (%)"),
+            color=alt.Color("Hotel:N", scale=alt.Scale(scheme="tableau10"), legend=None)
         )
         .properties(height=300)
     )

@@ -202,6 +202,17 @@ def generate_graphic_pdf(summary_df, report_date=None, logo_path=None):
             fig.text(0.01, 0.10, footer_left, fontsize=9, ha='left', va='bottom')
             fig.text(0.99, 0.10, footer_right, fontsize=9, ha='right', va='bottom')
 
+        cmap = plt.get_cmap('tab10')
+        special_colors = {
+            "Daun Bali Seminyak": "#10B981",  # emerald/green
+            "Daun Bali Seminyak Hotel": "#10B981",
+            "Kamania Hotel Petitenget": "#EF4444",  # red
+            "Kamanya Petitenget": "#EF4444",
+        }
+        def _color_for(h):
+            return special_colors.get(h, cmap((hotels.index(h)) % 10))
+        bar_colors = [_color_for(h) for h in hotels]
+
         page_no = 1
         with PdfPages(pdf_path) as pdf:
             # 1) Occupancy chart + garis compset
@@ -210,7 +221,7 @@ def generate_graphic_pdf(summary_df, report_date=None, logo_path=None):
                 if df["Room_Available"].sum() > 0:
                     compset_occ = (df["Room_Sold"].sum() / df["Room_Available"].sum()) * 100.0
                 fig, ax = plt.subplots(figsize=(11.7, 8.3))  # A4 landscape-ish in inches
-                ax.bar(hotels, df.get("Occupancy", 0.0), color="#1f77b4")
+                ax.bar(hotels, df.get("Occupancy", 0.0), color=bar_colors)
                 ax.axhline(compset_occ, color="red", linestyle="--", linewidth=2, label=f"Compset {compset_occ:.1f}%")
                 ax.set_title("Occupancy vs Compset", fontsize=14)
                 ax.set_ylabel("Occupancy (%)")
@@ -227,7 +238,7 @@ def generate_graphic_pdf(summary_df, report_date=None, logo_path=None):
             try:
                 avg_rev = float(df.get("Room_Revenue", 0.0).sum()) / max(len(df), 1)
                 fig, ax = plt.subplots(figsize=(11.7, 8.3))
-                ax.bar(hotels, df.get("Room_Revenue", 0.0), color="#2ca02c")
+                ax.bar(hotels, df.get("Room_Revenue", 0.0), color=bar_colors)
                 ax.axhline(avg_rev, color="red", linestyle="--", linewidth=2, label=f"Avg {avg_rev:,.0f}")
                 ax.set_title("Revenue vs Compset Average", fontsize=14)
                 ax.set_ylabel("Revenue (IDR)")
@@ -245,7 +256,7 @@ def generate_graphic_pdf(summary_df, report_date=None, logo_path=None):
                 for idx_name, color in [("MPI", "#6366F1"), ("ARI", "#F59E0B"), ("RGI", "#EF4444")]:
                     if idx_name in df.columns:
                         fig, ax = plt.subplots(figsize=(11.7, 8.3))
-                        ax.bar(hotels, df[idx_name], color=color)
+                        ax.bar(hotels, df[idx_name], color=bar_colors)
                         ax.axhline(100.0, color="red", linestyle="--", linewidth=2, label="Benchmark 100")
                         ax.set_title(f"{idx_name} (100 = Benchmark)", fontsize=14)
                         ax.set_ylabel("Index")
@@ -263,7 +274,7 @@ def generate_graphic_pdf(summary_df, report_date=None, logo_path=None):
                 if "Market_Fair_Share" in df.columns and len(df) > 0:
                     avg_fair = 100.0 / len(df)
                     fig, ax = plt.subplots(figsize=(11.7, 8.3))
-                    ax.bar(hotels, df["Market_Fair_Share"], color="#10B981")
+                    ax.bar(hotels, df["Market_Fair_Share"], color=bar_colors)
                     ax.axhline(avg_fair, color="red", linestyle="--", linewidth=2, label=f"Avg {avg_fair:.1f}%")
                     ax.set_title("Market Fair Share (%)", fontsize=14)
                     ax.set_ylabel("%")

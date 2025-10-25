@@ -160,7 +160,6 @@ if os.path.exists(file_path):
     try:
         # Check file size first
         file_size = os.path.getsize(file_path)
-        st.info(f"📝 File size: {file_size} bytes")
         
         if file_size == 0:
             st.warning("⚠️ File CSV kosong. Membuat struktur baru.")
@@ -169,7 +168,6 @@ if os.path.exists(file_path):
             st.success("✅ Struktur CSV berhasil dibuat.")
         else:
             df = pd.read_csv(file_path, parse_dates=['Date'])
-            st.success(f"✅ Data dimuat dari: {file_path} ({len(df)} records)")
     except Exception as e:
         st.error(f"❌ File CSV gagal dibaca: {type(e).__name__}: {str(e)}")
         st.info("🔄 Mencoba membuat file baru...")
@@ -234,7 +232,6 @@ if os.path.exists(capacity_path):
             st.warning("⚠️ room_capacity.csv kosong. Akan dibuat ulang.")
             raise FileNotFoundError("Empty file")
         capacity_df = pd.read_csv(capacity_path)
-        st.success(f"✅ Room capacity dimuat: {len(capacity_df)} hotels")
     except Exception as e:
         st.warning(f"⚠️ Gagal membaca room_capacity.csv: {e}. Membuat data sampel.")
         capacity_df = pd.DataFrame(columns=['Hotel', 'Room_Available'])
@@ -491,16 +488,6 @@ if not df.empty:
 
 
         table_df_formatted = table_df.copy()
-        badges = []
-        for _, row in table_df.iterrows():
-            if row.get('Hotel') == 'TOTAL':
-                badges.append('Σ TOTAL')
-            elif row.get('Rank') == 1:
-                badges.append('🏆 TOP')
-            else:
-                badges.append('')
-        # Sisipkan kolom Badge di posisi awal
-        table_df_formatted.insert(0, 'Badge', badges)
         for col in ['Room_Available', 'Room_Sold']:
             table_df_formatted[col] = table_df_formatted[col].map('{:,.0f}'.format)
         for col in ['Revenue']:
